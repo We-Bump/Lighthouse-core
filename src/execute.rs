@@ -18,7 +18,7 @@ use cosmwasm_std::{
 // use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::helpers::{ create_group_key, create_token_uri, validate_merkle_proof, hash };
+use crate::helpers::{ create_group_key, create_token_uri, validate_merkle_proof, hash, create_min_log_key };
 
 use crate::state::{
     CONFIG,
@@ -28,7 +28,7 @@ use crate::state::{
     COLLECTIONS,
     INSTANTIATE_INFO,
     MintInfo,
-    MINT_INFO,
+    MINT_INFO, MINT_LOG,
 };
 use cw721_base::{ helpers::Cw721Contract, msg::InstantiateMsg as Cw721InstantiateMsg, Extension };
 
@@ -78,6 +78,7 @@ pub fn register_collection(
     royalty_wallet: String,
     mint_groups: Vec<MintGroup>,
     iterated_uri: bool,
+    start_order: Option<u32>,
     extension: Extension
 ) -> Result<Response, ContractError> {
     let mut config: Config = CONFIG.load(deps.storage)?;
@@ -95,10 +96,11 @@ pub fn register_collection(
         token_uri,
         royalty_percent,
         royalty_wallet,
-        next_token_id: 0,
+        next_token_id: start_order.unwrap_or(0),
         mint_groups,
         extension,
-        iterated_uri: iterated_uri
+        iterated_uri: iterated_uri,
+        start_order
     };
 
     for group in collection.mint_groups.clone() {
@@ -150,7 +152,8 @@ pub fn update_collection(
     royalty_percent: u64,
     royalty_wallet: String,
     mint_groups: Vec<MintGroup>,
-    iterated_uri: bool
+    iterated_uri: bool,
+    start_order: Option<u32>
 ) -> Result<Response, ContractError> {
     let mut collection = COLLECTIONS.load(deps.storage, collection_addr.clone())?;
 
@@ -158,7 +161,7 @@ pub fn update_collection(
         return Err(ContractError::Unauthorized {});
     }
 
-    if supply < collection.next_token_id {
+    if supply < collection.next_token_id - collection.start_order.unwrap_or(0) {
         return Err(ContractError::SupplyLowerThanMinted {});
     }
 
@@ -180,6 +183,7 @@ pub fn update_collection(
     collection.royalty_wallet = royalty_wallet;
     collection.mint_groups = mint_groups;
     collection.iterated_uri = iterated_uri;
+    collection.start_order = start_order;
 
     COLLECTIONS.save(deps.storage, collection_addr.clone(), &collection)?;
 
@@ -202,7 +206,7 @@ pub fn mint_native(
     let recipient = recipient_addr.unwrap_or(info.sender.clone());
 
     // Check if sold out
-    if collection.next_token_id >= collection.supply {
+    if collection.next_token_id - collection.start_order.unwrap_or(0) >= collection.supply {
         return Err(ContractError::SoldOut {});
     }
 
@@ -334,6 +338,9 @@ pub fn mint_native(
     // Update the mint info
     mint_info.mints.push(collection.next_token_id - 1);
     MINT_INFO.save(deps.storage, key, &mint_info)?;
+
+    let log_key = create_min_log_key(&collection_addr, &(collection.next_token_id - 1).to_string());
+    MINT_LOG.save(deps.storage, log_key, &recipient)?;
 
     // Return the response
     Ok(

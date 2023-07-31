@@ -11,10 +11,10 @@ use cw_utils::{maybe_addr, parse_reply_instantiate_data};
 
 use crate::error::ContractError;
 use crate::execute::{mint_native, register_collection, update_collection, update_config};
-use crate::helpers::create_group_key;
+use crate::helpers::{create_group_key, create_min_log_key};
 use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
 use crate::state::{
-    Collection, Config, MintInfo, COLLECTIONS, CONFIG, INSTANTIATE_INFO, MINT_INFO
+    Collection, Config, MintInfo, COLLECTIONS, CONFIG, INSTANTIATE_INFO, MINT_INFO, MINT_LOG
 };
 use crate::structs::{CollectionResponseMinimal, CollectionsResponse};
 
@@ -64,6 +64,7 @@ pub fn execute(
             mint_groups,
             extension,
             iterated_uri,
+            start_order
         } => register_collection(
             deps,
             env,
@@ -77,6 +78,7 @@ pub fn execute(
             royalty_wallet,
             mint_groups,
             iterated_uri,
+            start_order,
             extension,
             
         ),
@@ -105,7 +107,8 @@ pub fn execute(
             royalty_percent,
             royalty_wallet,
             mint_groups,
-            iterated_uri
+            iterated_uri,
+            start_order
         } => update_collection(
             deps,
             env,
@@ -118,7 +121,8 @@ pub fn execute(
             royalty_percent,
             royalty_wallet,
             mint_groups,
-            iterated_uri
+            iterated_uri,
+            start_order
         ),
         ExecuteMsg::UpdateConfig {
             extension,
@@ -226,6 +230,13 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 
                 to_binary(&CollectionsResponse { collections })
             }
+        }
+        QueryMsg::GetMinterOf { collection, token_id } => {
+            let key = create_min_log_key(&collection, &token_id);
+
+            let minter = MINT_LOG.load(deps.storage, key)?;
+
+            to_binary(&minter)
         }
     }
 }

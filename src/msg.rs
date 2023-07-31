@@ -1,4 +1,4 @@
-use cosmwasm_schema::{cw_serde};
+use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Uint128, Addr};
 use cw721_base::Extension;
 
@@ -30,6 +30,7 @@ pub enum ExecuteMsg {
         mint_groups: Vec<MintGroup>,
         extension: Extension,
         iterated_uri: bool,
+        start_order: Option<u32>,
     },
     UpdateCollection {
         collection: String,
@@ -41,6 +42,7 @@ pub enum ExecuteMsg {
         royalty_wallet: String,
         mint_groups: Vec<MintGroup>,
         iterated_uri: bool,
+        start_order: Option<u32>,
     },
     MintNative {
         collection: String,
@@ -70,5 +72,9 @@ pub enum QueryMsg {
         start_after: Option<String>,
         limit: Option<u32>,
         result_type: Option<String>, // "full" or "minimal"
-    }
+    },
+    GetMinterOf {
+        collection: String,
+        token_id: String,
+    },
 }

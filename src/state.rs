@@ -32,6 +32,7 @@ pub struct Collection {
     pub mint_groups: Vec<MintGroup>,
     pub extension: Extension,
     pub iterated_uri: bool,
+    pub start_order: Option<u32>,
 }
 
 #[cw_serde]
@@ -53,5 +54,6 @@ pub struct MintInfo {
 }
 
 pub const MINT_INFO: Map<String, MintInfo> = Map::new("mint_info");
+pub const MINT_LOG: Map<String, Addr> = Map::new("mint_log");
 
 pub const INSTANTIATE_INFO: Map<u64, Collection> = Map::new("instantiate_info");

@@ -31,6 +31,10 @@ pub fn create_group_key(addr: &Addr, collection_addr: &str, group_name: &str) ->
     format!("{}_{}_{}", addr, collection_addr, group_name)
 }
 
+pub fn create_min_log_key(collection_addr: &str, token_id: &str) -> String {
+    format!("{}_{}", collection_addr, token_id)
+}
+
 pub fn create_token_uri(token_uri: &str, token_id: &str, iterated_uri: &bool) -> String {
     if !iterated_uri {
         format!("{}/{}", token_uri, token_id)
