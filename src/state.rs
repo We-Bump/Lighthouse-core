@@ -1,7 +1,7 @@
 
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Addr, Uint128};
-use cw721_base::Extension;
+
 use cw_storage_plus::{Item, Map};
 
 use crate::structs::Creator;
@@ -9,7 +9,6 @@ use crate::structs::Creator;
 #[cw_serde]
 pub struct Config{
     pub admin: Addr,
-    pub extension: Extension,
     pub fee: Uint128,
     pub registeration_open: bool,
     pub next_reply_id: u64,
@@ -30,9 +29,12 @@ pub struct Collection {
     pub royalty_wallet: String,
     pub next_token_id: u32,
     pub mint_groups: Vec<MintGroup>,
-    pub extension: Extension,
     pub iterated_uri: bool,
     pub start_order: Option<u32>,
+    pub frozen: bool,
+    pub hidden_metadata: bool,
+    pub placeholder_token_uri: Option<String>,
+
 }
 
 #[cw_serde]

@@ -1,12 +1,9 @@
 use cosmwasm_schema::cw_serde;
 use cosmwasm_std::{Uint128, Addr};
-use cw721_base::Extension;
-
 use crate::state::MintGroup;
 
 #[cw_serde]
 pub struct InstantiateMsg {
-    pub extension: Extension,
     pub fee: Uint128,
     pub registeration_open: bool,
     pub denom: String,
@@ -15,7 +12,6 @@ pub struct InstantiateMsg {
 #[cw_serde]
 pub enum ExecuteMsg {
     UpdateConfig {
-        extension: Option<Extension>,
         fee: Option<Uint128>,
         registeration_open: Option<bool>,
     },
@@ -28,9 +24,11 @@ pub enum ExecuteMsg {
         royalty_percent: u64,
         royalty_wallet: String,
         mint_groups: Vec<MintGroup>,
-        extension: Extension,
         iterated_uri: bool,
         start_order: Option<u32>,
+        frozen: bool,
+        hidden_metadata:bool,
+        placeholder_token_uri: Option<String>,
     },
     UpdateCollection {
         collection: String,
@@ -50,12 +48,17 @@ pub enum ExecuteMsg {
         recipient: Option<Addr>,
         merkle_proof: Option<Vec<Vec<u8>>>,
         hashed_address: Option<Vec<u8>>,
-    }
-    /*MintCw20 {
-        group: String,
-        recipient: Option<Addr>,
-        amount: Uint128,
-    },*/
+    },
+    UnfreezeCollection {
+        collection: String,
+    },
+    RevealCollectionMetadata {
+        collection: String,
+    },
+    UpdateRevealCollectionMetadata {
+        collection: String,
+        placeholder_token_uri: String,
+    },
 }
 
 #[cw_serde]

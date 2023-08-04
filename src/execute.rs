@@ -18,7 +18,13 @@ use cosmwasm_std::{
 // use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::helpers::{ create_group_key, create_token_uri, validate_merkle_proof, hash, create_min_log_key };
+use crate::helpers::{
+    create_group_key,
+    create_token_uri,
+    validate_merkle_proof,
+    hash,
+    create_min_log_key,
+};
 
 use crate::state::{
     CONFIG,
@@ -28,17 +34,18 @@ use crate::state::{
     COLLECTIONS,
     INSTANTIATE_INFO,
     MintInfo,
-    MINT_INFO, MINT_LOG,
+    MINT_INFO,
+    MINT_LOG,
 };
-use cw721_base::{ helpers::Cw721Contract, msg::InstantiateMsg as Cw721InstantiateMsg, Extension };
+use cw721_base::helpers::Cw721Contract;
 
 use cw2981_royalties::{ ExecuteMsg as Cw2981ExecuteMsg, Metadata as Cw2981Metadata };
+use crate::structs::{ Cw2981InstantiateMsg, Cw2981LHExecuteMsg };
 
 pub fn update_config(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    extension: Option<Extension>,
     fee: Option<Uint128>,
     registeration_open: Option<bool>
 ) -> Result<Response, ContractError> {
@@ -46,10 +53,6 @@ pub fn update_config(
 
     if config.admin != info.sender {
         return Err(ContractError::Unauthorized {});
-    }
-
-    if extension.is_some() {
-        config.extension = extension.unwrap();
     }
 
     if fee.is_some() {
@@ -79,7 +82,9 @@ pub fn register_collection(
     mint_groups: Vec<MintGroup>,
     iterated_uri: bool,
     start_order: Option<u32>,
-    extension: Extension
+    frozen: bool,
+    hidden_metadata: bool,
+    placeholder_token_uri: Option<String>
 ) -> Result<Response, ContractError> {
     let mut config: Config = CONFIG.load(deps.storage)?;
 
@@ -98,9 +103,11 @@ pub fn register_collection(
         royalty_wallet,
         next_token_id: start_order.unwrap_or(0),
         mint_groups,
-        extension,
         iterated_uri: iterated_uri,
-        start_order
+        start_order,
+        frozen,
+        hidden_metadata,
+        placeholder_token_uri: placeholder_token_uri.clone(),
     };
 
     for group in collection.mint_groups.clone() {
@@ -119,10 +126,13 @@ pub fn register_collection(
         msg: (WasmMsg::Instantiate {
             code_id: cw721_code,
             msg: to_binary(
-                &(Cw721InstantiateMsg {
+                &(Cw2981InstantiateMsg {
                     name: name.clone(),
                     symbol: symbol.clone(),
                     minter: env.contract.address.to_string(),
+                    frozen,
+                    hidden_metadata,
+                    placeholder_token_uri,
                 })
             )?,
             funds: vec![],
@@ -239,16 +249,10 @@ pub fn mint_native(
         if sender_address_hash != hashed_address.clone().unwrap() {
             return Err(ContractError::InvalidSender {});
         }
-        
+
         // Check that the merkle proof and root is valid
         let merkle_root = group.merkle_root.clone().unwrap();
-        if
-            !validate_merkle_proof(
-                merkle_proof.unwrap(),
-                merkle_root,
-                hashed_address.unwrap()
-            )
-        {
+        if !validate_merkle_proof(merkle_proof.unwrap(), merkle_root, hashed_address.unwrap()) {
             return Err(ContractError::InvalidMerkleProof {});
         }
     }
@@ -264,7 +268,7 @@ pub fn mint_native(
         return Err(ContractError::MaxTokensMinted {});
     }
 
-    if !group.unit_price.is_zero(){
+    if !group.unit_price.is_zero() {
         // Check if the sender have enough funds
         if
             info.funds.len() != 1 ||
@@ -273,7 +277,7 @@ pub fn mint_native(
         {
             return Err(ContractError::InvalidFunds {});
         }
-    } else{
+    } else {
         // Check if the sender have enough funds
         if
             info.funds.len() != 1 ||
@@ -286,13 +290,13 @@ pub fn mint_native(
 
     let mut response = Response::new();
 
-    if !group.unit_price.is_zero(){
+    if !group.unit_price.is_zero() {
         // Transfer the funds to the collection creator wallet
         for share in group.creators.clone() {
             let creator_funds = BankMsg::Send {
                 to_address: share.address.to_string(),
                 amount: coins(
-                    group.unit_price.u128() * (share.share as u128) / 100,
+                    (group.unit_price.u128() * (share.share as u128)) / 100,
                     config.denom.clone()
                 ),
             };
@@ -319,7 +323,11 @@ pub fn mint_native(
         token_id: collection.next_token_id.to_string(),
         owner: recipient.to_string(),
         token_uri: Some(
-            create_token_uri(&collection.token_uri, &collection.next_token_id.to_string(), &collection.iterated_uri)
+            create_token_uri(
+                &collection.token_uri,
+                &collection.next_token_id.to_string(),
+                &collection.iterated_uri
+            )
         ),
         extension,
     };
@@ -353,5 +361,115 @@ pub fn mint_native(
             .add_attribute("recipient", recipient.to_string())
             .add_attribute("token_id", (collection.next_token_id.clone() - 1).to_string())
             .add_attribute("price", group.unit_price.to_string())
+    )
+}
+
+pub fn unfreeze_collection(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    collection_addr: String
+) -> Result<Response, ContractError> {
+    let mut collection = COLLECTIONS.load(deps.storage, collection_addr.clone())?;
+
+    if collection.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    collection.frozen = false;
+
+    COLLECTIONS.save(deps.storage, collection_addr.clone(), &collection)?;
+
+    let unfreeze_msg: cw721_base::ExecuteMsg<
+        Empty,
+        Cw2981LHExecuteMsg
+    > = cw721_base::ExecuteMsg::Extension { msg: Cw2981LHExecuteMsg::Unfreeze {} };
+
+    let callback = Cw721Contract::<Empty, Cw2981LHExecuteMsg>(
+        collection.cw721_address.clone().unwrap(),
+        PhantomData,
+        PhantomData
+    ).call(unfreeze_msg)?;
+
+    Ok(
+        Response::new()
+            .add_message(callback)
+            .add_attribute("action", "unfreeze")
+            .add_attribute("collection", collection_addr)
+    )
+}
+
+pub fn reveal_collection_metadata(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    collection_addr: String
+) -> Result<Response, ContractError> {
+    let mut collection = COLLECTIONS.load(deps.storage, collection_addr.clone())?;
+
+    if collection.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    collection.hidden_metadata = false;
+
+    COLLECTIONS.save(deps.storage, collection_addr.clone(), &collection)?;
+
+    let reveal_msg: cw721_base::ExecuteMsg<
+        Empty,
+        Cw2981LHExecuteMsg
+    > = cw721_base::ExecuteMsg::Extension { msg: Cw2981LHExecuteMsg::Reveal {} };
+
+    let callback = Cw721Contract::<Empty, Cw2981LHExecuteMsg>(
+        collection.cw721_address.clone().unwrap(),
+        PhantomData,
+        PhantomData
+    ).call(reveal_msg)?;
+
+    Ok(
+        Response::new()
+            .add_message(callback)
+            .add_attribute("action", "reveal")
+            .add_attribute("collection", collection_addr)
+    )
+}
+
+pub fn update_reveal_collection_metadata(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    collection_addr: String,
+    placeholder_token_uri: String
+) -> Result<Response, ContractError> {
+    let mut collection = COLLECTIONS.load(deps.storage, collection_addr.clone())?;
+
+    if collection.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    collection.placeholder_token_uri = Some(placeholder_token_uri.clone());
+
+    COLLECTIONS.save(deps.storage, collection_addr.clone(), &collection)?;
+
+    let update_reveal_uri_msg: cw721_base::ExecuteMsg<
+        Empty,
+        Cw2981LHExecuteMsg
+    > = cw721_base::ExecuteMsg::Extension {
+        msg: Cw2981LHExecuteMsg::UpdateRevealData {
+            placeholder_token_uri: Some(placeholder_token_uri),
+        },
+    };
+
+    let callback = Cw721Contract::<Empty, Cw2981LHExecuteMsg>(
+        collection.cw721_address.clone().unwrap(),
+        PhantomData,
+        PhantomData
+    ).call(update_reveal_uri_msg)?;
+
+    Ok(
+        Response::new()
+            .add_message(callback)
+            .add_attribute("action", "update_reveal_collection_metadata")
+            .add_attribute("collection", collection_addr)
     )
 }

@@ -1,39 +1,63 @@
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
-    to_binary, Addr, Binary, Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply, Response,
+    to_binary,
+    Addr,
+    Binary,
+    Deps,
+    DepsMut,
+    Empty,
+    Env,
+    MessageInfo,
+    Order,
+    Reply,
+    Response,
     StdResult,
 };
 use cw2::set_contract_version;
 use cw_storage_plus::Bound;
-use cw_utils::{maybe_addr, parse_reply_instantiate_data};
+use cw_utils::{ maybe_addr, parse_reply_instantiate_data };
 // use cw2::set_contract_version;
 
 use crate::error::ContractError;
-use crate::execute::{mint_native, register_collection, update_collection, update_config};
-use crate::helpers::{create_group_key, create_min_log_key};
-use crate::msg::{ExecuteMsg, InstantiateMsg, QueryMsg};
-use crate::state::{
-    Collection, Config, MintInfo, COLLECTIONS, CONFIG, INSTANTIATE_INFO, MINT_INFO, MINT_LOG
+use crate::execute::{
+    mint_native,
+    register_collection,
+    update_collection,
+    update_config,
+    unfreeze_collection,
+    reveal_collection_metadata,
+    update_reveal_collection_metadata,
 };
-use crate::structs::{CollectionResponseMinimal, CollectionsResponse};
+use crate::helpers::{ create_group_key, create_min_log_key };
+use crate::msg::{ ExecuteMsg, InstantiateMsg, QueryMsg };
+use crate::state::{
+    Collection,
+    Config,
+    MintInfo,
+    COLLECTIONS,
+    CONFIG,
+    INSTANTIATE_INFO,
+    MINT_INFO,
+    MINT_LOG,
+};
+use crate::structs::{ CollectionResponseMinimal, CollectionsResponse };
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:lighthouse";
-const CONTRACT_VERSION: &str = "0.1.0";
+const CONTRACT_VERSION: &str = "0.3.0";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
     deps: DepsMut,
     _env: Env,
     info: MessageInfo,
-    msg: InstantiateMsg,
+    msg: InstantiateMsg
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     let config = Config {
         admin: info.sender,
-        extension: msg.extension,
         fee: msg.fee,
         registeration_open: msg.registeration_open,
         next_reply_id: 0,
@@ -50,7 +74,7 @@ pub fn execute(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
-    msg: ExecuteMsg,
+    msg: ExecuteMsg
 ) -> Result<Response, ContractError> {
     match msg {
         ExecuteMsg::RegisterCollection {
@@ -62,42 +86,41 @@ pub fn execute(
             royalty_percent,
             royalty_wallet,
             mint_groups,
-            extension,
-            iterated_uri,
-            start_order
-        } => register_collection(
-            deps,
-            env,
-            info,
-            cw721_code,
-            name,
-            symbol,
-            supply,
-            token_uri,
-            royalty_percent,
-            royalty_wallet,
-            mint_groups,
             iterated_uri,
             start_order,
-            extension,
-            
-        ),
-        ExecuteMsg::MintNative {
-            collection,
-            group,
-            recipient,
-            merkle_proof,
-            hashed_address,
-        } => mint_native(
-            deps,
-            env,
-            info,
-            collection,
-            group,
-            recipient,
-            merkle_proof,
-            hashed_address,
-        ),
+            frozen,
+            hidden_metadata,
+            placeholder_token_uri,
+        } =>
+            register_collection(
+                deps,
+                env,
+                info,
+                cw721_code,
+                name,
+                symbol,
+                supply,
+                token_uri,
+                royalty_percent,
+                royalty_wallet,
+                mint_groups,
+                iterated_uri,
+                start_order,
+                frozen,
+                hidden_metadata,
+                placeholder_token_uri,
+            ),
+        ExecuteMsg::MintNative { collection, group, recipient, merkle_proof, hashed_address } =>
+            mint_native(
+                deps,
+                env,
+                info,
+                collection,
+                group,
+                recipient,
+                merkle_proof,
+                hashed_address
+            ),
         ExecuteMsg::UpdateCollection {
             collection,
             name,
@@ -108,27 +131,31 @@ pub fn execute(
             royalty_wallet,
             mint_groups,
             iterated_uri,
-            start_order
-        } => update_collection(
-            deps,
-            env,
-            info,
-            collection,
-            name,
-            symbol,
-            supply,
-            token_uri,
-            royalty_percent,
-            royalty_wallet,
-            mint_groups,
-            iterated_uri,
-            start_order
-        ),
-        ExecuteMsg::UpdateConfig {
-            extension,
-            fee,
-            registeration_open,
-        } => update_config(deps, env, info, extension, fee, registeration_open),
+            start_order,
+        } =>
+            update_collection(
+                deps,
+                env,
+                info,
+                collection,
+                name,
+                symbol,
+                supply,
+                token_uri,
+                royalty_percent,
+                royalty_wallet,
+                mint_groups,
+                iterated_uri,
+                start_order
+            ),
+        ExecuteMsg::UpdateConfig { fee, registeration_open } =>
+            update_config(deps, env, info, fee, registeration_open),
+        ExecuteMsg::UnfreezeCollection { collection } =>
+            unfreeze_collection(deps, env, info, collection),
+        ExecuteMsg::RevealCollectionMetadata { collection } =>
+            reveal_collection_metadata(deps, env, info, collection),
+        ExecuteMsg::UpdateRevealCollectionMetadata { collection, placeholder_token_uri } =>
+            update_reveal_collection_metadata(deps, env, info, collection, placeholder_token_uri),
     }
 }
 
@@ -142,23 +169,22 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
     let mut collection = instantiate_info.clone();
     collection.cw721_address = Some(Addr::unchecked(reply.contract_address).into());
 
-    if COLLECTIONS.has(
-        deps.storage,
-        collection.cw721_address.clone().unwrap().to_string(),
-    ) {
+    if COLLECTIONS.has(deps.storage, collection.cw721_address.clone().unwrap().to_string()) {
         return Err(ContractError::CollectionExists {});
     }
 
     COLLECTIONS.save(
         deps.storage,
         collection.cw721_address.clone().unwrap().to_string(),
-        &collection,
+        &collection
     )?;
     INSTANTIATE_INFO.remove(deps.storage, msg.id);
 
-    Ok(Response::new()
-        .add_attribute("register_collection", "success")
-        .add_attribute("collection", collection.cw721_address.unwrap().to_string()))
+    Ok(
+        Response::new()
+            .add_attribute("register_collection", "success")
+            .add_attribute("collection", collection.cw721_address.unwrap().to_string())
+    )
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
@@ -169,39 +195,31 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             let collection: Collection = COLLECTIONS.load(deps.storage, collection)?;
             to_binary(&collection)
         }
-        QueryMsg::BalanceOf {
-            address,
-            collection,
-        } => {
+        QueryMsg::BalanceOf { address, collection } => {
             let collection_info: Collection = COLLECTIONS.load(deps.storage, collection.clone())?;
             let mut mints = Vec::new();
             for group in collection_info.mint_groups {
                 let key = create_group_key(&address, &collection, &group.name);
-                let info = MINT_INFO
-                    .load(deps.storage, key.clone())
-                    .unwrap_or(MintInfo { mints: Vec::new() });
+                let info = MINT_INFO.load(deps.storage, key.clone()).unwrap_or(MintInfo {
+                    mints: Vec::new(),
+                });
                 mints.extend(info.mints);
             }
             to_binary(&(MintInfo { mints }))
         }
-        QueryMsg::GetCollections {
-            start_after,
-            limit,
-            result_type,
-        } => {
+        QueryMsg::GetCollections { start_after, limit, result_type } => {
             let default_limit = 10;
             let max_limit = 30;
             let limit = limit.unwrap_or(default_limit).min(max_limit) as usize;
             let start = maybe_addr(deps.api, start_after)?;
 
             if result_type.is_some() && result_type.clone().unwrap() == "full" {
-                let collections: Vec<_> = COLLECTIONS
-                    .range(
-                        deps.storage,
-                        start.map(Bound::exclusive),
-                        None,
-                        Order::Ascending,
-                    )
+                let collections: Vec<_> = COLLECTIONS.range(
+                    deps.storage,
+                    start.map(Bound::exclusive),
+                    None,
+                    Order::Ascending
+                )
                     .take(limit)
                     .map(|item| {
                         let (_key, value) = item?;
@@ -209,15 +227,14 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                     })
                     .collect::<StdResult<_>>()?;
 
-                to_binary(&CollectionsResponse { collections })
+                to_binary(&(CollectionsResponse { collections }))
             } else {
-                let collections: Vec<_> = COLLECTIONS
-                    .range(
-                        deps.storage,
-                        start.map(Bound::exclusive),
-                        None,
-                        Order::Ascending,
-                    )
+                let collections: Vec<_> = COLLECTIONS.range(
+                    deps.storage,
+                    start.map(Bound::exclusive),
+                    None,
+                    Order::Ascending
+                )
                     .take(limit)
                     .map(|item| {
                         let (_key, value) = item?;
@@ -228,7 +245,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
                     })
                     .collect::<StdResult<_>>()?;
 
-                to_binary(&CollectionsResponse { collections })
+                to_binary(&(CollectionsResponse { collections }))
             }
         }
         QueryMsg::GetMinterOf { collection, token_id } => {
