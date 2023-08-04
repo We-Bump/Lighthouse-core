@@ -5,4 +5,4 @@ Lighthouse core contract. Light house is a tool for creating NFT collection on t
 
 ### Contract Address
 > Atlantic-2
-> sei1tae8sxwht8zh5pfd2ac2l6ex97rk4jkd23gw5sczgjxgey9lduusptyaqn
+> sei1daj8pj34e7n58w45av8qt8y30hkcq2lqav0sqz4pva9twh5a2nyq9m6zq7
