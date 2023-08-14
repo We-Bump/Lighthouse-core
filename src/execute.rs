@@ -277,7 +277,7 @@ pub fn mint_native(
         {
             return Err(ContractError::InvalidFunds {});
         }
-    } else {
+    }/* else {
         // Check if the sender have enough funds
         if
             info.funds.len() != 1 ||
@@ -286,7 +286,7 @@ pub fn mint_native(
         {
             return Err(ContractError::InvalidFunds {});
         }
-    }
+    }*/
 
     let mut response = Response::new();
 
@@ -305,11 +305,16 @@ pub fn mint_native(
         }
     }
 
-    // Transfer the fee contract admin
-    let admin_funds = BankMsg::Send {
-        to_address: config.admin.to_string(),
-        amount: coins(config.fee.u128(), config.denom.clone()),
-    };
+
+    if !group.unit_price.is_zero(){
+        // Transfer the fee contract admin
+        let admin_funds = BankMsg::Send {
+            to_address: config.admin.to_string(),
+            amount: coins(config.fee.u128(), config.denom.clone()),
+        };
+
+        response = response.add_message(admin_funds);
+    }
 
     // Init royalty extension
     let extension = Some(Cw2981Metadata {
@@ -354,7 +359,6 @@ pub fn mint_native(
     Ok(
         response
             .add_message(callback)
-            .add_message(admin_funds)
             .add_attribute("action", "mint")
             .add_attribute("collection", collection_addr)
             .add_attribute("group", group.name.clone())

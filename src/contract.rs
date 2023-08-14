@@ -45,7 +45,7 @@ use crate::structs::{ CollectionResponseMinimal, CollectionsResponse };
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:lighthouse";
-const CONTRACT_VERSION: &str = "0.3.0";
+const CONTRACT_VERSION: &str = "0.3.4";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
