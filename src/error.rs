@@ -50,4 +50,7 @@ pub enum ContractError {
 
     #[error("Share percentage sum must equal to 100")]
     InvalidShares {},
+
+    #[error("Collection is renounced and cannot be updated")]
+    Renounced {},
 }

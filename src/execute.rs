@@ -35,7 +35,7 @@ use crate::state::{
     INSTANTIATE_INFO,
     MintInfo,
     MINT_INFO,
-    MINT_LOG,
+    MINT_LOG, RENOUNCE_INFO,
 };
 use cw721_base::helpers::Cw721Contract;
 
@@ -171,6 +171,12 @@ pub fn update_collection(
         return Err(ContractError::Unauthorized {});
     }
 
+    let renounce_info = RENOUNCE_INFO.load(deps.storage, collection_addr.clone());
+
+    if renounce_info.is_ok() && renounce_info.unwrap() {
+        return Err(ContractError::Renounced {});
+    }
+
     if supply < collection.next_token_id - collection.start_order.unwrap_or(0) {
         return Err(ContractError::SupplyLowerThanMinted {});
     }
@@ -277,7 +283,7 @@ pub fn mint_native(
         {
             return Err(ContractError::InvalidFunds {});
         }
-    }/* else {
+    } /* else {
         // Check if the sender have enough funds
         if
             info.funds.len() != 1 ||
@@ -305,8 +311,7 @@ pub fn mint_native(
         }
     }
 
-
-    if !group.unit_price.is_zero(){
+    if !group.unit_price.is_zero() {
         // Transfer the fee contract admin
         let admin_funds = BankMsg::Send {
             to_address: config.admin.to_string(),
@@ -475,5 +480,49 @@ pub fn update_reveal_collection_metadata(
             .add_message(callback)
             .add_attribute("action", "update_reveal_collection_metadata")
             .add_attribute("collection", collection_addr)
+    )
+}
+
+pub fn update_admin(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    collection_addr: String,
+    new_admin: Addr
+) -> Result<Response, ContractError> {
+    let mut collection = COLLECTIONS.load(deps.storage, collection_addr.clone())?;
+
+    if collection.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    collection.admin = new_admin.clone();
+
+    COLLECTIONS.save(deps.storage, collection_addr.clone(), &collection)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "update_admin")
+        .add_attribute("collection", collection_addr)
+        .add_attribute("new_admin", new_admin.to_string())
+    )
+}
+
+pub fn renounce_collection(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    collection_addr: String
+) -> Result<Response, ContractError> {
+    let collection = COLLECTIONS.load(deps.storage, collection_addr.clone())?;
+
+    if collection.admin != info.sender {
+        return Err(ContractError::Unauthorized {});
+    }
+
+    RENOUNCE_INFO.save(deps.storage, collection_addr.clone(), &true)?;
+
+    Ok(Response::new()
+        .add_attribute("action", "renounce_collection")
+        .add_attribute("collection", collection_addr)
     )
 }

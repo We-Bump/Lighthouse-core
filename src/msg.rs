@@ -59,6 +59,13 @@ pub enum ExecuteMsg {
         collection: String,
         placeholder_token_uri: String,
     },
+    UpdateAdmin {
+        collection: String,
+        admin: Addr,
+    },
+    RenounceCollection {
+        collection: String,
+    },
 }
 
 #[cw_serde]
@@ -79,5 +86,8 @@ pub enum QueryMsg {
     GetMinterOf {
         collection: String,
         token_id: String,
+    },
+    IsCollectionRenounced {
+        collection: String,
     },
 }

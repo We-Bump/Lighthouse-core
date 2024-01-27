@@ -59,3 +59,6 @@ pub const MINT_INFO: Map<String, MintInfo> = Map::new("mint_info");
 pub const MINT_LOG: Map<String, Addr> = Map::new("mint_log");
 
 pub const INSTANTIATE_INFO: Map<u64, Collection> = Map::new("instantiate_info");
+
+pub const RENOUNCE_INFO: Map<String, bool> = Map::new("renounce_info");
+

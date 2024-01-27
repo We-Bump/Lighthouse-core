@@ -27,7 +27,7 @@ use crate::execute::{
     update_config,
     unfreeze_collection,
     reveal_collection_metadata,
-    update_reveal_collection_metadata,
+    update_reveal_collection_metadata, update_admin, renounce_collection,
 };
 use crate::helpers::{ create_group_key, create_min_log_key };
 use crate::msg::{ ExecuteMsg, InstantiateMsg, QueryMsg };
@@ -39,13 +39,13 @@ use crate::state::{
     CONFIG,
     INSTANTIATE_INFO,
     MINT_INFO,
-    MINT_LOG,
+    MINT_LOG, RENOUNCE_INFO,
 };
 use crate::structs::{ CollectionResponseMinimal, CollectionsResponse };
 
 // version info for migration info
 const CONTRACT_NAME: &str = "crates.io:lighthouse";
-const CONTRACT_VERSION: &str = "0.3.4";
+const CONTRACT_VERSION: &str = "0.3.8";
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -156,6 +156,10 @@ pub fn execute(
             reveal_collection_metadata(deps, env, info, collection),
         ExecuteMsg::UpdateRevealCollectionMetadata { collection, placeholder_token_uri } =>
             update_reveal_collection_metadata(deps, env, info, collection, placeholder_token_uri),
+        ExecuteMsg::UpdateAdmin { collection, admin } =>
+            update_admin(deps, env, info, collection, admin),
+        ExecuteMsg::RenounceCollection { collection } =>
+            renounce_collection(deps, env, info, collection),
     }
 }
 
@@ -254,6 +258,10 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             let minter = MINT_LOG.load(deps.storage, key)?;
 
             to_binary(&minter)
+        }
+        QueryMsg::IsCollectionRenounced { collection } => {
+            let renounce_info = RENOUNCE_INFO.load(deps.storage, collection)?;
+            to_binary(&renounce_info)
         }
     }
 }
