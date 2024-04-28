@@ -239,10 +239,6 @@ pub fn mint_native(
         return Err(ContractError::GroupNotOpenToMint {});
     }
 
-    if group.end_time != 0 && group.end_time < env.block.time.seconds() {
-        return Err(ContractError::GroupNotOpenToMint {});
-    }
-
     // Validate merkle proof (if any merkle root is set)
     if group.merkle_root.is_some() {
         if merkle_proof.is_none() || hashed_address.is_none() {
