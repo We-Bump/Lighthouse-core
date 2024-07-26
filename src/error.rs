@@ -12,11 +12,17 @@ pub enum ContractError {
     #[error("Registeration is close")]
     RegisterationClose {},
 
-    #[error("Collection already exists")]
+    #[error("Collection Exists")]
     CollectionExists {},
 
-    #[error("Collection Already Instantiated")]
-    CollectionAlreadyInstantiated {},
+    #[error("LightHouse contract is not set to be MINTER_ROLE")]
+    NotMinter {},
+
+    #[error("Supply lower than minted")]
+    SupplyLowerThanMinted {},
+
+    #[error("Invalid Chain")]
+    InvalidChain {},
 
     #[error("Sold out")]
     SoldOut {},
@@ -27,30 +33,48 @@ pub enum ContractError {
     #[error("Group Not Open to Mint")]
     GroupNotOpenToMint {},
 
-    #[error("Invalid Funds")]
-    InvalidFunds {},
-
-    #[error("Max Tokens Minted")]
-    MaxTokensMinted {},
-
-    #[error("Supply cannot be lower than already minted token count")]
-    SupplyLowerThanMinted {},
-
-    #[error("Invalid Merkle Root")]
-    InvalidMerkleRoot {},
-
     #[error("Invalid Merkle Proof")]
     InvalidMerkleProof  {},
 
-    #[error("Invalid Sender")]
-    InvalidSender {},
+    #[error("Cannot Mint More Than Max Tokens")]
+    MaxTokensMinted {},
 
-    #[error("Invalid Reply ID")]
-    InvalidReplyId {},
+    #[error("Reserved Supply Ran Out")]
+    ReservedSupplyRanOut {},
 
-    #[error("Share percentage sum must equal to 100")]
-    InvalidShares {},
+    #[error("Invalid Funds")]
+    InvalidFunds {},
 
-    #[error("Collection is renounced and cannot be updated")]
-    Renounced {},
+    #[error("Invalid Token")]
+    PartnerNotFound {},
+
+    #[error("InvalidFeePercent")]
+    InvalidFeePercent,
+
+    #[error("Insufficient Balance for Token Gate")]
+    InsufficientBalanceForTokenGate {},
+
+    #[error("Invalid Gate")]
+    InvalidGate {},
+
+    #[error("Invalid Gate Args")]
+    InvalidGateArgs {},
+
+    #[error("Invalid Owner of NFT")]
+    InvalidOwnerOfNft {},
+
+    #[error("AlreadyMintedForGatedTokenId")]
+    AlreadyMintedForGatedTokenId {},
+
+    #[error("Not implemented")]
+    NotImplemented {},
+
+    #[error("Not available for EVM")]
+    NotAvailableForEVM {},
+
+    #[error("Address not associated")]
+    NotAssociatedAddress {},
+
+    #[error("Invalid Token Id")]
+    InvalidTokenId {},
 }
